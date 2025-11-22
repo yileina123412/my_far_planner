@@ -1,186 +1,134 @@
 #ifndef POINT_STRUCT_H
 #define POINT_STRUCT_H
-
-#define EPSILON 1e-7f
+/*定义了Point3D结构体，用于记录点以及点的运算*/
+#define EPSILON 1e-7f  //定义了一个很小的浮点数常量
 
 #include <math.h>
-#include <vector>
-#include <utility>
-#include <iostream>
+#include <pcl/common/distances.h>  //点云距离函数
+#include <pcl/point_cloud.h>       //点云数据容器
+#include <pcl/point_types.h>       //点类型
+#include <ros/console.h>           //ros日志输出比如 ROS_INFO
 #include <stdlib.h>
+
+#include <Eigen/Core>                 //提供数据类型
+#include <boost/functional/hash.hpp>  //boost函数哈希库
 #include <deque>
+#include <iostream>
 #include <unordered_map>
-#include <Eigen/Core>
-#include <pcl/point_types.h>
-#include <pcl/point_cloud.h>
-#include <pcl/common/distances.h>
-#include <boost/functional/hash.hpp>
-
-// ROS message support
-#include <ros/console.h>
-
+#include <utility>
+#include <vector>
 
 typedef pcl::PointXYZI PCLPoint;
 typedef pcl::PointCloud<PCLPoint> PointCloud;
 typedef pcl::PointCloud<PCLPoint>::Ptr PointCloudPtr;
 
 struct Point3D {
-  float x, y, z;
-  float intensity;
-  Point3D() = default;
-  Point3D(float _x, float _y, float _z):\
-      x(_x), y(_y), z(_z), intensity(0) {}
-  Point3D(float _x, float _y, float _z, float _i):\
-      x(_x), y(_y), z(_z), intensity(_i) {}
-  Point3D(Eigen::Vector3f vec):\
-      x(vec(0)), y(vec(1)), z(vec(2)), intensity(0) {}
-  Point3D(Eigen::Vector3d vec):\
-      x(vec(0)), y(vec(1)), z(vec(2)), intensity(0) {}
-  Point3D(PCLPoint pt):\
-      x(pt.x), y(pt.y), z(pt.z), intensity(pt.intensity) {}
+    float x, y, z;
+    float intensity;
 
-  bool operator ==(const Point3D& pt) const
-  {
-    return fabs(x - pt.x) < EPSILON &&
-           fabs(y - pt.y) < EPSILON &&
-           fabs(z - pt.z) < EPSILON;
-  }
-
-  bool operator !=(const Point3D& pt) const
-  {
-    return fabs(x - pt.x) > EPSILON ||
-           fabs(y - pt.y) > EPSILON ||
-           fabs(z - pt.z) > EPSILON;
-  }
-
-  float operator *(const Point3D& pt) const
-  {
-      return x * pt.x + y * pt.y + z * pt.z;
-  }
-
-  Point3D operator *(const float factor) const
-  {
-      return Point3D(x*factor, y*factor, z*factor);
-  }
-
-  Point3D operator /(const float factor) const
-  {
-      return Point3D(x/factor, y/factor, z/factor);
-  }
-
-  Point3D operator +(const Point3D& pt) const
-  {
-      return Point3D(x+pt.x, y+pt.y, z+pt.z);
-  }
-  template <typename Point>
-  Point3D operator -(const Point& pt) const
-  {
-      return Point3D(x-pt.x, y-pt.y, z-pt.z);
-  }
-  Point3D operator -() const
-  {
-      return Point3D(-x, -y, -z);
-  }
-  float norm() const
-  {
-    return std::hypotf(x, std::hypotf(y,z));
-  };
-
-  float norm_flat() const
-  {
-    return std::hypotf(x, y);
-  };
-
-  Point3D normalize() const 
-  {
-    const float n = std::hypotf(x, std::hypotf(y,z));
-    if (n > EPSILON) {
-      return Point3D(x/n, y/n, z/n);
-    } else {
-      // DEBUG
-      // ROS_WARN("Point3D: vector normalization fails, vector norm is too small.");
-      return Point3D(0,0,0);
+    Point3D() = default;
+    Point3D(float _x, float _y, float _z) : x(_x), y(_y), z(_z), intensity(0) {}
+    Point3D(float _x, float _y, float _z, float _intensity) : x(_x), y(_y), z(_z), intensity(_intensity) {}
+    Point3D(Eigen::Vector3f vec) : x(vec(0)), y(vec(1)), z(vec(2)), intensity(0) {}
+    Point3D(Eigen::Vector3d vec) : x(vec(0)), y(vec(1)), z(vec(2)), intensity(0) {}
+    Point3D(PCLPoint pt) : x(pt.x), y(pt.y), z(pt.z), intensity(pt.intensity) {}
+    //重载符号
+    bool operator==(const Point3D& pt) const {
+        return fabs(x - pt.x) < EPSILON && fabs(y - pt.y) < EPSILON && fabs(z - pt.z) < EPSILON;
     }
-  };
-
-  Point3D normalize_flat() const 
-  {
-    const float n = std::hypotf(x, y);
-    if (n > EPSILON) {
-      return Point3D(x/n, y/n, 0.0f);
-    } else {
-      // DEBUG
-      // ROS_WARN("Point3D: flat vector normalization fails, vector norm is too small.");
-      return Point3D(0,0,0);
+    bool operator!=(const Point3D& pt) const {
+        return fabs(x - pt.x) > EPSILON || fabs(y - pt.y) > EPSILON || fabs(z - pt.z) > EPSILON;
     }
-  };
-
-  float norm_dot(Point3D p) const
-  {
-    const float n1 = std::hypotf(x, std::hypotf(y,z));
-    const float n2 = std::hypotf(p.x, std::hypotf(p.y,p.z));
-    if (n1 < EPSILON || n2 < EPSILON) {
-      // DEBUG
-      // ROS_WARN("Point3D: vector norm dot fails, vector norm is too small.");
-      return 0.f;
+    float operator*(const Point3D& pt) const {
+        return x * pt.x + y * pt.y + z * pt.z;
     }
-    const float dot_value = (x * p.x + y * p.y + z * p.z) / (n1 * n2);
-    return std::min(std::max(-1.0f, dot_value), 1.0f);
-  };
-
-  float norm_flat_dot(Point3D p) const
-  {
-    const float n1 = std::hypotf(x, y);
-    const float n2 = std::hypotf(p.x, p.y);
-    if (n1 < EPSILON || n2 < EPSILON) {
-      // DEBUG
-      // ROS_WARN("Point3D: flat vector norm dot fails, vector norm is too small.");
-      return 0.f;
+    Point3D operator*(const float& factor) const {
+        return Point3D(x * factor, y * factor, z * factor);
     }
-    const float dot_value = (x * p.x + y * p.y) / (n1 * n2);
-    return std::min(std::max(-1.0f, dot_value), 1.0f);
-  };
-
-  std::string ToString() const
-  {
-    return "x = " + std::to_string(x).substr(0,6) + "; " + 
-           "y = " + std::to_string(y).substr(0,6) + "; " + 
-           "z = " + std::to_string(z).substr(0,6) + " "; 
-  };
-  
-  friend std::ostream& operator<<(std::ostream& os, const Point3D& p)
-  {
-    os << "["<< p.ToString() << "] ";
-    return os;
-  }
+    Point3D operator+(const Point3D& pt) const {
+        return Point3D(x + pt.x, y + pt.y, z + pt.z);
+    }
+    Point3D operator/(const float& factor) const {
+        return Point3D(x / factor, y / factor, z / factor);
+    }
+    template <typename Point>
+    Point3D operator-(const Point& pt) const {
+        return Point3D(x - pt.x, y - pt.y, z - pt.z);
+    }
+    Point3D operator-() const {
+        return Point3D(-x, -y, -x);
+    }
+    //成员函数
+    float norm() const {
+        return std::hypotf(x, std::hypotf(y, z));
+    }
+    float norm_flat() const {
+        return std::hypotf(x, y);
+    }
+    Point3D normalize() const {
+        const float n = std::hypotf(x, std::hypotf(y, z));
+        if (n > EPSILON) {
+            return Point3D(x / n, y / n, z / n);
+        } else {
+            return Point3D(0, 0, 0);
+        }
+    }
+    Point3D normalize_flat() const {
+        const float n = std::hypotf(x, std::hypotf(y, z));
+        if (n > ESPIPE) {
+            return Point3D(x / n, y / n, 0.0f);
+        } else {
+            return Point3D(0, 0, 0);
+        }
+    }
+    float norm_dot(Point3D p) const {
+        const float n1 = std::hypotf(x, std::hypotf(y, z));
+        const float n2 = std::hypotf(p.x, std::hypotf(p.y, p.z));
+        if (n1 < EPSILON || n2 < EPSILON) {
+            return 0.f;
+        }
+        const float dot_value = (x * p.x + y * p.y + z * p.z) / (n1 * n2);
+        return std::min(std::max(-1.0f, dot_value), 1.0f);
+    }
+    float norm_flat_dot(Point3D p) const {
+        const float n1 = std::hypotf(x, y);
+        const float n2 = std::hypotf(p.x, p.y);
+        if (n1 < EPSILON || n2 < EPSILON) {
+            return 0.f;
+        }
+        const float dot_value = (x * p.x + y * p.y) / (n1 * n2);
+        return std::min(std::max(-1.0f, dot_value), 1.0f);
+    }
+    std::string ToString() const {
+        return "x = " + std::to_string(x).substr(0, 6) + "; " + "y = " + std::to_string(y).substr(0, 6) + "; " +
+               "z = " + std::to_string(z).substr(0, 6) + " ";
+    }
+    friend std::ostream& operator<<(std::ostream& os, const Point3D& p) {
+        os << "[" << p.ToString() << "]";
+        return os;
+    }
 };
 
-struct point_hash
-{
-  std::size_t operator() (const Point3D& p) const
-  {
-    std::size_t seed = 0;
-    boost::hash_combine(seed, p.x);
-    boost::hash_combine(seed, p.y);
-    boost::hash_combine(seed, p.z);
-    return seed;
-  }
+struct point_hash {
+    std::size_t operator()(const Point3D& p) const {
+        std::size_t seed = 0;
+        boost::hash_combine(seed, p.x);
+        boost::hash_combine(seed, p.y);
+        boost::hash_combine(seed, p.z);
+        return seed;
+    }
 };
 
-struct point_comp
-{
-  bool operator()(const Point3D& p1, const Point3D& p2) const
-  {
-    return p1 == p2;
-  }
+struct point_comp {
+    bool operator()(const Point3D& p1, const Point3D& p2) const {
+        return p1 == p2;
+    }
 };
 
-struct intensity_comp
-{
-  bool operator()(const Point3D& p1, const Point3D& p2) const
-  {
-    return p1.intensity < p2.intensity;
-  }
+struct intensity_comp {
+    bool operator()(const Point3D& p1, const Point3D& p2) const {
+        return p1.intensity < p2.intensity;
+    }
 };
 
 #endif

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.5)
 project(far_planner)
 
 set(CMAKE_CXX_STANDARD 14)
@@ -60,13 +60,13 @@ set(SOURCES ${SOURCES}
   src/dynamic_graph.cpp
   src/planner_visualizer.cpp
   src/utility.cpp
-  src/graph_planner.cpp
+  # src/graph_planner.cpp
   src/contour_detector.cpp
   src/contour_graph.cpp
   src/map_handler.cpp
-  src/scan_handler.cpp
-  src/graph_msger.cpp
-  src/terrain_planner.cpp
+  # src/scan_handler.cpp
+  # src/graph_msger.cpp
+  # src/terrain_planner.cpp
 )
 
 ## Declare executables
@@ -85,3 +85,14 @@ install(TARGETS ${PROJECT_NAME}
 install(DIRECTORY launch/
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
 )
+
+#### test
+add_executable(test_point src/test_main.cpp)
+target_link_libraries(test_point 
+    ${catkin_LIBRARIES}
+    ${PCL_LIBRARIES}
+    ${Eigen3_LIBRARIES}
+    ${OpenCV_LIBS}
+)
+
+
