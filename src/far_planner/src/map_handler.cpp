@@ -272,7 +272,7 @@ void MapHandler::TraversableAnalysis(const PointCloudPtr& terrainHeightOut) {
     // Lambda Function
     // 判断相邻网格是否可通行  所谓的可通行就是查看点云是否是和车的位置接近，就是是不是地面点
     auto IsTraversableNeighbor = [&](const int& cur_id, const int& ref_id) {
-        if (terrain_grid_occupy_list_[ref_id == 0]) return false;
+        if (terrain_grid_occupy_list_[ref_id] == 0) return false;
         const float cur_h = terrain_height_grid_->GetCell(cur_id)[0];
         float ref_h = 0.0f;
         int counter = 0;
@@ -281,8 +281,8 @@ void MapHandler::TraversableAnalysis(const PointCloudPtr& terrainHeightOut) {
             ref_h += e, counter++;
         }
         if (counter > 0) {
-            terrain_height_grid_->GetCell(ref_h).resize(1);
-            terrain_height_grid_->GetCell(ref_h)[0] = ref_h / counter;
+            terrain_height_grid_->GetCell(ref_id).resize(1);
+            terrain_height_grid_->GetCell(ref_id)[0] = ref_h / counter;
             return true;
         }
         return false;
@@ -374,9 +374,45 @@ void MapHandler::ObsNeighborCloudWithTerrain(
     }
 }
 
-void MapHandler::AdjustNodesHeight(const NodePtrStack& nodes) {}
+void MapHandler::AdjustNodesHeight(const NodePtrStack& nodes) {
+    if (nodes.empty()) return;
+    for (const auto& node_ptr : nodes) {
+        if (!node_ptr->is_active || node_ptr->is_boundary || FARUtil::IsFreeNavNode(node_ptr) ||
+            FARUtil::IsOutsideGoal(node_ptr) || !FARUtil::IsPointInLocalRange(node_ptr->position, true)) {
+            continue;
+        }
+        bool is_match = false;
+        float terrain_h = TerrainHeightOfPoint(node_ptr->position, is_match, false);
+        if (is_match) {
+            terrain_h += FARUtil::vehicle_height;
+            if (node_ptr->pos_filter_vec.empty()) {
+                node_ptr->position.z = terrain_h;
+            } else {
+                node_ptr->pos_filter_vec.back().z = terrain_h;
+                node_ptr->position.z = FARUtil::AveragePoints(node_ptr->pos_filter_vec).z;
+            }
+        }
+    }
+}
 
-void MapHandler::AdjustCTNodeHeight(const CTNodeStack& ctnodes) {}
+void MapHandler::AdjustCTNodeHeight(const CTNodeStack& ctnodes) {
+    if (ctnodes.empty()) return;
+    const float H_MAX = FARUtil::robot_pos.z + FARUtil::kTolerZ;
+    const float H_MIN = FARUtil::robot_pos.z - FARUtil::kTolerZ;
+    for (auto& ctnode_ptr : ctnodes) {
+        float min_th, max_th;
+        const float avg_h = NearestHeightOfRadius(
+            ctnode_ptr->position, FARUtil::kMatchDist, min_th, max_th, ctnode_ptr->is_ground_associate);
+        if (ctnode_ptr->is_ground_associate) {
+            ctnode_ptr->position.z = min_th + FARUtil::vehicle_height;
+            ctnode_ptr->position.z = std::max(std::min(ctnode_ptr->position.z, H_MAX), H_MIN);
+        } else {
+            ctnode_ptr->position.z = TerrainHeightOfPoint(ctnode_ptr->position, ctnode_ptr->is_ground_associate, true);
+            ctnode_ptr->position.z += FARUtil::vehicle_height;
+            ctnode_ptr->position.z = std::max(std::min(ctnode_ptr->position.z, H_MAX), H_MIN);
+        }
+    }
+}
 
 bool MapHandler::IsNavPointOnTerrainNeighbor(const Point3D& p, const bool& is_extend) {
     const float h = p.z - FARUtil::vehicle_height;

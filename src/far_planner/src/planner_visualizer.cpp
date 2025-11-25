@@ -82,31 +82,31 @@ void DPVisualizer::VizContourGraph(const CTNodeStack& contour_graph) {
         geometry_msgs::Point geo_vertex, geo_connect;
         geo_vertex = FARUtil::Point3DToGeoMsgPoint(ctnode_ptr->position);
 
-        // contour_vertex_marker.points.push_back(geo_vertex);
-        // if (ctnode_ptr->is_global_match) {
-        //     vertex_matched_marker.points.push_back(geo_vertex);
-        // }
-        // if (ctnode_ptr->is_contour_necessary) {
-        //     necessary_vertex_marker.points.push_back(geo_vertex);
-        // }
-
-        if (ctnode_ptr->free_direct == NodeFreeDirect::CONVEX) {
-            contour_vertex_marker.points.push_back(geo_vertex);
-        }
-        if (ctnode_ptr->free_direct == NodeFreeDirect::UNKNOW) {
+        contour_vertex_marker.points.push_back(geo_vertex);
+        if (ctnode_ptr->is_global_match) {
             vertex_matched_marker.points.push_back(geo_vertex);
         }
-        if (ctnode_ptr->free_direct == NodeFreeDirect::CONCAVE) {
+        if (ctnode_ptr->is_contour_necessary) {
             necessary_vertex_marker.points.push_back(geo_vertex);
         }
 
-        // if (ctnode_ptr->front == NULL || ctnode_ptr->back == NULL) return;
-        // contour_marker.points.push_back(geo_vertex);
-        // geo_connect = FARUtil::Point3DToGeoMsgPoint(ctnode_ptr->front->position);
-        // contour_marker.points.push_back(geo_connect);
-        // contour_marker.points.push_back(geo_vertex);
-        // geo_connect = FARUtil::Point3DToGeoMsgPoint(ctnode_ptr->back->position);
-        // contour_marker.points.push_back(geo_connect);
+        // if (ctnode_ptr->free_direct == NodeFreeDirect::CONVEX) {
+        //     contour_vertex_marker.points.push_back(geo_vertex);
+        // }
+        // if (ctnode_ptr->free_direct == NodeFreeDirect::UNKNOW) {
+        //     vertex_matched_marker.points.push_back(geo_vertex);
+        // }
+        // if (ctnode_ptr->free_direct == NodeFreeDirect::CONCAVE) {
+        //     necessary_vertex_marker.points.push_back(geo_vertex);
+        // }
+
+        if (ctnode_ptr->front == NULL || ctnode_ptr->back == NULL) return;
+        contour_marker.points.push_back(geo_vertex);
+        geo_connect = FARUtil::Point3DToGeoMsgPoint(ctnode_ptr->front->position);
+        contour_marker.points.push_back(geo_connect);
+        contour_marker.points.push_back(geo_vertex);
+        geo_connect = FARUtil::Point3DToGeoMsgPoint(ctnode_ptr->back->position);
+        contour_marker.points.push_back(geo_connect);
     };
     auto Draw_Surf_Dir = [&](const CTNodePtr& ctnode) {
         geometry_msgs::Point p1, p2, p3;
@@ -132,7 +132,7 @@ void DPVisualizer::VizContourGraph(const CTNodeStack& contour_graph) {
             continue;
         }
         Draw_Contour(ctnode);
-        // Draw_Surf_Dir(ctnode);
+        Draw_Surf_Dir(ctnode);
     }
     contour_marker_array.markers.push_back(contour_vertex_marker);
     contour_marker_array.markers.push_back(vertex_matched_marker);

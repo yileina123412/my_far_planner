@@ -64,7 +64,7 @@ struct NavNode {
     bool is_odom;                         //  是否为当前位置
     bool is_goal;                         //  是否是目标节点
     bool is_near_nodes;                   //  是否在机器人处理范围内
-    bool is_wide_near;                    //  是否在机器人扩展处理范围内
+    bool is_wide_near;                    //  是否在机器人扩展处理范围内  wide_near_nodes_里面
     bool is_merged;                       //  标记是否应被删除
     bool is_covered;                      //  是否位于已探索的自由空间
     //  定义前沿点：一个**“值得探索的”、“稳定的”、“非噪声的”、位于感知边界的凸点**
@@ -75,7 +75,8 @@ struct NavNode {
     int clear_dumper_count;  //  计数器，如果一个节点多帧未被扫描会增加，结合is_merged
     std::deque<int> frontier_votes;  //  投票决定is_frontier
     std::unordered_set<std::size_t> invalid_boundary;  //  存储与我相连但被当前障碍物阻挡的其他边接节点id 动态障碍物
-    std::vector<std::shared_ptr<NavNode>> connect_nodes;  //  图的边  最终可通行的图，是A*算法在这个搜索路径的
+    std::vector<std::shared_ptr<NavNode>>
+        connect_nodes;  //  已确认的连接 图的边  最终可通行的图，是A*算法在这个搜索路径的
     //  这些的区别是边的不同来源，是connect_nodes的子集
     std::vector<std::shared_ptr<NavNode>>
         poly_connects;  //  通过视线检查存储的边  DynamicGraph 中的 IsValidConnect 函数会调用

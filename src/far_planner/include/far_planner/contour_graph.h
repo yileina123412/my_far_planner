@@ -121,10 +121,15 @@ private:
     }
 
     static inline void RemoveMatchWithNavNode(const NavNodePtr& node_ptr) {
+        if (node_ptr == NULL) return;
         if (!node_ptr->is_contour_match) return;
+        if (node_ptr->ctnode == NULL) {
+            node_ptr->is_contour_match = false;
+            return;
+        }
         node_ptr->ctnode->is_global_match = false;
         node_ptr->ctnode->nav_node_id = 0;
-        node_ptr->is_contour_match = false;
+
         node_ptr->ctnode = NULL;
     }
 

@@ -75,7 +75,7 @@ struct Point3D {
     }
     Point3D normalize_flat() const {
         const float n = std::hypotf(x, std::hypotf(y, z));
-        if (n > ESPIPE) {
+        if (n > EPSILON) {
             return Point3D(x / n, y / n, 0.0f);
         } else {
             return Point3D(0, 0, 0);

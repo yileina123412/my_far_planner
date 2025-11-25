@@ -47,7 +47,7 @@ public:
     void AdjustNodesHeight(const NodePtrStack& nodes);
 
     void AdjustCTNodeHeight(const CTNodeStack& ctnodes);
-    // 判断导航点是不是在地形相关的领域网络中  就是是否在neighbor_obs_indices_索引范围内
+    // 判断导航点是不是在地形相关的领域网络中  就是是否在neighbor_obs_indices_索引范围内或者extend_obs_indices_
     static bool IsNavPointOnTerrainNeighbor(const Point3D& p, const bool& is_extend);
 
     static float NearestTerrainHeightofNavPoint(const Point3D& point, bool& is_associated);

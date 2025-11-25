@@ -263,27 +263,36 @@ void FARMaster::Loop() {
             odom_node_ptr_, FARUtil::surround_obs_cloud_, realworld_contour_);
         // 将轮廓点转化为ct点
         contour_graph_.UpdateContourGraph(odom_node_ptr_, realworld_contour_);
+
+        map_handler_.AdjustCTNodeHeight(ContourGraph::contour_graph_);
+        map_handler_.AdjustNodesHeight(nav_graph_);
+        graph_manager_.UpdateGlobalNearNodes();
+        near_nav_graph_ = graph_manager_.GetExtendLocalNode();
+
         // 匹配当前的导航点和ct点，筛选出没有匹配到导航点的新ct点
-        contour_graph_.MatchContourWithNavGraph(nav_graph_, nav_graph_, new_ctnodes_);
+        contour_graph_.MatchContourWithNavGraph(nav_graph_, near_nav_graph_, new_ctnodes_);
         ROS_INFO("new_ctnodes_: %ld ", new_ctnodes_.size());
 
         // 相机的可视化
-        if (master_params_.is_visual_opencv) {
-            FARUtil::ConvertCTNodeStackToPCL(new_ctnodes_, new_vertices_ptr_);
-            cv::Mat cloud_img = contour_detector_.GetCloudImgMat();
-            contour_detector_.ShowCornerImage(cloud_img, new_vertices_ptr_);
-        }
+        // if (master_params_.is_visual_opencv) {
+        //     FARUtil::ConvertCTNodeStackToPCL(new_ctnodes_, new_vertices_ptr_);
+        //     cv::Mat cloud_img = contour_detector_.GetCloudImgMat();
+        //     contour_detector_.ShowCornerImage(cloud_img, new_vertices_ptr_);
+        // }
         /* update planner graph */
         new_nodes_.clear();
         if (!is_stop_update_ && graph_manager_.ExtractGraphNodes(new_ctnodes_)) {
             new_nodes_ = graph_manager_.GetNewNodes();
         }
-        std::cout << "    "
-                  << "Number of new vertices adding to global V-Graph: " << new_nodes_.size() << std::endl;
+
         /* Graph Updating */
         graph_manager_.UpdateNavGraph(new_nodes_, is_stop_update_, clear_nodes_);
 
-        planner_viz_.VizNodes(new_nodes_, "new_nodes", VizColor::ORANGE);
+        nav_graph_ = graph_manager_.GetNavGraph();
+        std::cout << "    "
+                  << "Number of all vertices adding to global V-Graph: " << nav_graph_.size() << std::endl;
+
+        planner_viz_.VizNodes(nav_graph_, "new_nodes", VizColor::ORANGE);
         planner_viz_.VizContourGraph(ContourGraph::contour_graph_);
 
         ros::Duration elapsed_time = ros::Time::now() - start_time;

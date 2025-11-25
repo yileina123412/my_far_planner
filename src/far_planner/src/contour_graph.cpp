@@ -123,11 +123,16 @@ bool ContourGraph::IsAPillarPolygon(const PointStack& vertex_points, float& peri
 // 分析ct点的表面方向和凹凸性
 void ContourGraph::AnalysisSurfAngleAndConvexity(const CTNodeStack& contour_graph) {
     for (const auto& ctnode_ptr : contour_graph) {
+        if (ctnode_ptr == NULL) continue;
         if (ctnode_ptr->free_direct == NodeFreeDirect::PILLAR || ctnode_ptr->poly_ptr->is_pillar) {
             ctnode_ptr->surf_dirs = {Point3D(0, 0, -1), Point3D(0, 0, -1)};
             ctnode_ptr->poly_ptr->is_pillar = true;
             ctnode_ptr->free_direct = NodeFreeDirect::PILLAR;
         } else {
+            if (ctnode_ptr->front == NULL || ctnode_ptr->back == NULL) {
+                ctnode_ptr->free_direct = NodeFreeDirect::UNKNOW;
+                continue;
+            }
             CTNodePtr next_ctnode;
             // front direction
             next_ctnode = ctnode_ptr->front;
@@ -142,7 +147,7 @@ void ContourGraph::AnalysisSurfAngleAndConvexity(const CTNodeStack& contour_grap
             }
             if (edis < FARUtil::kNavClearDist) {
                 ctnode_ptr->surf_dirs = {Point3D(0, 0, -1), Point3D(0, 0, -1)};
-                ctnode_ptr->free_direct == NodeFreeDirect::PILLAR;
+                ctnode_ptr->free_direct = NodeFreeDirect::PILLAR;
                 ctnode_ptr->poly_ptr->is_pillar = true;
                 continue;
             } else {
@@ -162,7 +167,7 @@ void ContourGraph::AnalysisSurfAngleAndConvexity(const CTNodeStack& contour_grap
             }
             if (edis < FARUtil::kNavClearDist) {
                 ctnode_ptr->surf_dirs = {Point3D(0, 0, -1), Point3D(0, 0, -1)};
-                ctnode_ptr->free_direct == NodeFreeDirect::PILLAR;
+                ctnode_ptr->free_direct = NodeFreeDirect::PILLAR;
                 ctnode_ptr->poly_ptr->is_pillar = true;
                 continue;
             } else {
@@ -184,9 +189,9 @@ void ContourGraph::AnalysisConvexityOfCTNode(const CTNodePtr& ctnode_ptr) {
     }
     // 增加调试输出
 
-    ROS_INFO("CG: Analyzing node at (%.2f, %.2f), surf_dirs: (%.3f, %.3f) + (%.3f, %.3f)", ctnode_ptr->position.x,
-        ctnode_ptr->position.y, ctnode_ptr->surf_dirs.first.x, ctnode_ptr->surf_dirs.first.y,
-        ctnode_ptr->surf_dirs.second.x, ctnode_ptr->surf_dirs.second.y);
+    // ROS_INFO("CG: Analyzing node at (%.2f, %.2f), surf_dirs: (%.3f, %.3f) + (%.3f, %.3f)", ctnode_ptr->position.x,
+    //     ctnode_ptr->position.y, ctnode_ptr->surf_dirs.first.x, ctnode_ptr->surf_dirs.first.y,
+    //     ctnode_ptr->surf_dirs.second.x, ctnode_ptr->surf_dirs.second.y);
 
     bool is_wall = false;
     const Point3D topo_dir = FARUtil::SurfTopoDirect(ctnode_ptr->surf_dirs, is_wall);
@@ -296,16 +301,22 @@ NavNodePtr ContourGraph::NearestNavNodeForCTNode(const CTNodePtr& ctnode_ptr, co
     float min_edist = FARUtil::kINF;
     const float dir_thred = 0.5f;
     for (const auto& node_ptr : near_nodes) {
+        if (node_ptr == NULL) continue;
         if (node_ptr->is_odom || node_ptr->is_navpoint || FARUtil::IsOutsideGoal(node_ptr) ||
             !IsInMatchHeight(ctnode_ptr, node_ptr))
             continue;
         // pillar只和pillar匹配
-        if ((node_ptr->free_direct == NodeFreeDirect::PILLAR && ctnode_ptr->free_direct != NodeFreeDirect::PILLAR) ||
-            (node_ptr->free_direct != NodeFreeDirect::PILLAR && ctnode_ptr->free_direct == NodeFreeDirect::PILLAR)) {
-            continue;
-        }
+
+        bool is_node_pillar = (node_ptr->free_direct == NodeFreeDirect::PILLAR);
+        bool is_ct_pillar = (ctnode_ptr->free_direct == NodeFreeDirect::PILLAR);
+        if (is_node_pillar != is_ct_pillar) continue;
+        // if ((node_ptr->free_direct == NodeFreeDirect::PILLAR && ctnode_ptr->free_direct != NodeFreeDirect::PILLAR) ||
+        //     (node_ptr->free_direct != NodeFreeDirect::PILLAR && ctnode_ptr->free_direct == NodeFreeDirect::PILLAR)) {
+        //     continue;
+        // }
         float dist_thread = FARUtil::kMatchDist;
-        float dir_score = 0.0f;
+        float match_score = 0.0f;
+        float dir_score = 0.2f;
         if (ctnode_ptr->free_direct != NodeFreeDirect::PILLAR && node_ptr->free_direct != NodeFreeDirect::PILLAR &&
             node_ptr->free_direct != NodeFreeDirect::UNKNOW) {
             if (ctnode_ptr->free_direct == node_ptr->free_direct) {
