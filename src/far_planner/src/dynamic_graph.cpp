@@ -736,12 +736,15 @@ bool DynamicGraph::IsInterNavpointNecessary() {
             const float cur_dist = (internav_ptr->position - last_connect_pos_).norm();
             if (cur_dist < min_dist) min_dist = cur_dist;
         }
-
-        // // 添加检查：如果当前位置距离上次连接位置很近，不要创建新点
-        // const float pos_change = (FARUtil::free_odom_p - last_connect_pos_).norm();
-        // if (pos_change < FARUtil::kNearDist / 2.0f) {  // 添加位置变化检查
-        //     return false;
-        // }
+        if (is_bridge_internav_) {
+            ROS_INFO("is_bridge_internav_");
+        }
+        if (it == odom_node_ptr_->edge_votes.end()) {
+            ROS_INFO("it == odom_node_ptr_->edge_votes.end()");
+        }
+        if (!this->IsInternavInRange(cur_internav_ptr_)) {
+            ROS_INFO("!this->IsInternavInRange(cur_internav_ptr_)");
+        }
 
         if (min_dist > FARUtil::kNavClearDist && min_dist < FARUtil::kINF) return true;
     }
