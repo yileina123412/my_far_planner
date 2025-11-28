@@ -5,12 +5,47 @@ void DPVisualizer::Init(const ros::NodeHandle& nh) {
     point_cloud_ptr_ = PointCloudPtr(new PointCloud());
     // Rviz Publisher
     viz_node_pub_ = nh_.advertise<Marker>("/viz_node_topic", 5);
+    viz_nav_node_pub_ = nh_.advertise<MarkerArray>("/viz_nav_node_topic", 5);
     viz_path_pub_ = nh_.advertise<Marker>("/viz_path_topic", 5);
     viz_poly_pub_ = nh_.advertise<MarkerArray>("/viz_poly_topic", 5);
     viz_graph_pub_ = nh_.advertise<MarkerArray>("/viz_graph_topic", 5);
     viz_contour_pub_ = nh_.advertise<MarkerArray>("/viz_contour_topic", 5);
     viz_map_pub_ = nh_.advertise<MarkerArray>("/viz_grid_map_topic", 5);
     viz_view_extend = nh_.advertise<MarkerArray>("/viz_viewpoint_extend_topic", 5);
+}
+void DPVisualizer::VizNavNodes(const NodePtrStack& node_stack, const std::string& ns, const VizColor& color1,
+    const VizColor& color2, const float scale, const float alpha) {
+    MarkerArray graph_marker_array;
+    Marker node_marker, nav_marker;
+    node_marker.type = Marker::SPHERE_LIST;
+    nav_marker.type = Marker::SPHERE_LIST;
+    // 初始化 marker 属性
+    this->SetMarker(color1, ns + "_regular", scale, alpha, node_marker);
+    this->SetMarker(color2, ns + "_nav", scale, alpha, nav_marker);
+
+    // 清空点列表
+    node_marker.points.clear();
+    nav_marker.points.clear();
+
+    // node_marker.points.resize(node_stack.size());
+    std::size_t idx = 0;
+    for (const auto& node_ptr : node_stack) {
+        if (node_ptr == NULL) continue;
+        if (node_ptr->is_navpoint) {
+            nav_marker.points.push_back(FARUtil::Point3DToGeoMsgPoint(node_ptr->position));
+        } else {
+            node_marker.points.push_back(FARUtil::Point3DToGeoMsgPoint(node_ptr->position));
+        }
+    }
+    // node_marker.points.resize(idx);
+    // 只有当有点数据时才添加到 marker array
+    if (!node_marker.points.empty()) {
+        graph_marker_array.markers.push_back(node_marker);
+    }
+    if (!nav_marker.points.empty()) {
+        graph_marker_array.markers.push_back(nav_marker);
+    }
+    viz_nav_node_pub_.publish(graph_marker_array);
 }
 void DPVisualizer::VizNodes(const NodePtrStack& node_stack, const std::string& ns, const VizColor& color,
     const float scale, const float alpha) {
@@ -26,6 +61,180 @@ void DPVisualizer::VizNodes(const NodePtrStack& node_stack, const std::string& n
     }
     node_marker.points.resize(idx);
     viz_node_pub_.publish(node_marker);
+}
+
+void DPVisualizer::VizGraph(const NodePtrStack& graph) {
+    MarkerArray graph_marker_array;
+    Marker nav_node_marker, unfinal_node_marker, near_node_marker, covered_node_marker, internav_node_marker,
+        frontier_node_marker, edge_marker, visual_edge_marker, contour_edge_marker, free_edge_marker, odom_edge_marker,
+        goal_edge_marker, traj_edge_marker, corner_surf_marker, contour_align_marker, corner_helper_marker,
+        boundary_node_marker, boundary_edge_marker;
+    nav_node_marker.type = Marker::SPHERE_LIST;
+    unfinal_node_marker.type = Marker::SPHERE_LIST;
+    near_node_marker.type = Marker::SPHERE_LIST;
+    covered_node_marker.type = Marker::SPHERE_LIST;
+    internav_node_marker.type = Marker::SPHERE_LIST;
+    boundary_node_marker.type = Marker::SPHERE_LIST;
+    frontier_node_marker.type = Marker::SPHERE_LIST;
+    contour_align_marker.type = Marker::LINE_LIST;
+    edge_marker.type = Marker::LINE_LIST;
+    visual_edge_marker.type = Marker::LINE_LIST;
+    free_edge_marker.type = Marker::LINE_LIST;
+    contour_edge_marker.type = Marker::LINE_LIST;
+    odom_edge_marker.type = Marker::LINE_LIST;
+    goal_edge_marker.type = Marker::LINE_LIST;
+    traj_edge_marker.type = Marker::LINE_LIST;
+    boundary_edge_marker.type = Marker::LINE_LIST;
+    corner_surf_marker.type = Marker::LINE_LIST;
+    corner_helper_marker.type = Marker::CUBE_LIST;
+    this->SetMarker(VizColor::WHITE, "global_vertex", 0.5f, 0.5f, nav_node_marker);
+    this->SetMarker(VizColor::RED, "updating_vertex", 0.5f, 0.8f, unfinal_node_marker);
+    this->SetMarker(VizColor::MAGNA, "localrange_vertex", 0.5f, 0.8f, near_node_marker);
+    this->SetMarker(VizColor::BLUE, "freespace_vertex", 0.5f, 0.8f, covered_node_marker);
+    this->SetMarker(VizColor::YELLOW, "trajectory_vertex", 0.5f, 0.8f, internav_node_marker);
+    this->SetMarker(VizColor::GREEN, "boundary_vertex", 0.5f, 0.8f, boundary_node_marker);
+    this->SetMarker(VizColor::ORANGE, "frontier_vertex", 0.5f, 0.8f, frontier_node_marker);
+    this->SetMarker(VizColor::WHITE, "global_vgraph", 0.1f, 0.2f, edge_marker);
+    this->SetMarker(VizColor::EMERALD, "freespace_vgraph", 0.1f, 0.25f, free_edge_marker);
+    this->SetMarker(VizColor::EMERALD, "visibility_edge", 0.1f, 0.25f, visual_edge_marker);
+    this->SetMarker(VizColor::RED, "polygon_edge", 0.15f, 0.25f, contour_edge_marker);
+    this->SetMarker(VizColor::ORANGE, "boundary_edge", 0.2f, 0.25f, boundary_edge_marker);
+    this->SetMarker(VizColor::ORANGE, "odom_edge", 0.1f, 0.15f, odom_edge_marker);
+    this->SetMarker(VizColor::YELLOW, "to_goal_edge", 0.1f, 0.15f, goal_edge_marker);
+    this->SetMarker(VizColor::GREEN, "trajectory_edge", 0.1f, 0.5f, traj_edge_marker);
+    this->SetMarker(VizColor::YELLOW, "vertex_angle", 0.15f, 0.75f, corner_surf_marker);
+    this->SetMarker(VizColor::YELLOW, "angle_direct", 0.25f, 0.75f, corner_helper_marker);
+    this->SetMarker(VizColor::YELLOW, "vertices_matches", 0.1f, 0.75f, contour_align_marker);
+    /* Lambda Function */
+    auto Draw_Contour_Align = [&](const NavNodePtr& node_ptr) {
+        if (node_ptr->is_odom || !node_ptr->is_contour_match) return;
+        geometry_msgs::Point nav_pos, vertex_pos;
+        nav_pos = FARUtil::Point3DToGeoMsgPoint(node_ptr->position);
+        vertex_pos = FARUtil::Point3DToGeoMsgPoint(node_ptr->ctnode->position);
+        contour_align_marker.points.push_back(vertex_pos);
+        contour_align_marker.points.push_back(nav_pos);
+    };
+    auto Draw_Edge = [&](const NavNodePtr& node_ptr) {
+        geometry_msgs::Point p1, p2;
+        p1 = FARUtil::Point3DToGeoMsgPoint(node_ptr->position);
+        // navigable vgraph
+        for (const auto& cnode : node_ptr->connect_nodes) {
+            if (node_ptr->is_boundary && cnode->is_boundary &&
+                node_ptr->invalid_boundary.find(cnode->id) != node_ptr->invalid_boundary.end()) {
+                continue;
+            }
+            p2 = FARUtil::Point3DToGeoMsgPoint(cnode->position);
+            edge_marker.points.push_back(p1);
+            edge_marker.points.push_back(p2);
+        }
+        // poly edges
+        for (const auto& cnode : node_ptr->poly_connects) {
+            p2 = FARUtil::Point3DToGeoMsgPoint(cnode->position);
+            if (FARUtil::IsOutsideGoal(node_ptr) || FARUtil::IsOutsideGoal(cnode)) {
+                goal_edge_marker.points.push_back(p1);
+                goal_edge_marker.points.push_back(p2);
+            } else if (node_ptr->is_odom || cnode->is_odom) {
+                odom_edge_marker.points.push_back(p1);
+                odom_edge_marker.points.push_back(p2);
+            } else {
+                visual_edge_marker.points.push_back(p1);
+                visual_edge_marker.points.push_back(p2);
+                if (node_ptr->is_covered && cnode->is_covered) {
+                    free_edge_marker.points.push_back(p1);
+                    free_edge_marker.points.push_back(p2);
+                }
+            }
+        }
+        // contour edges
+        for (const auto& ct_cnode : node_ptr->contour_connects) {
+            p2 = FARUtil::Point3DToGeoMsgPoint(ct_cnode->position);
+            contour_edge_marker.points.push_back(p1);
+            contour_edge_marker.points.push_back(p2);
+            if (node_ptr->is_boundary && ct_cnode->is_boundary) {
+                boundary_edge_marker.points.push_back(p1);
+                boundary_edge_marker.points.push_back(p2);
+            }
+        }
+        // inter navigation trajectory connections
+        if (node_ptr->is_navpoint) {
+            for (const auto& tj_cnode : node_ptr->trajectory_connects) {
+                p2 = FARUtil::Point3DToGeoMsgPoint(tj_cnode->position);
+                traj_edge_marker.points.push_back(p1);
+                traj_edge_marker.points.push_back(p2);
+            }
+        }
+    };
+    auto Draw_Surf_Dir = [&](const NavNodePtr& node_ptr) {
+        geometry_msgs::Point p1, p2, p3;
+        p1 = FARUtil::Point3DToGeoMsgPoint(node_ptr->position);
+        Point3D end_p;
+        if (node_ptr->free_direct != NodeFreeDirect::PILLAR) {
+            end_p = node_ptr->position + node_ptr->surf_dirs.first * FARUtil::kVizRatio;
+            p2 = FARUtil::Point3DToGeoMsgPoint(end_p);
+            corner_surf_marker.points.push_back(p1);
+            corner_surf_marker.points.push_back(p2);
+            corner_helper_marker.points.push_back(p2);
+            end_p = node_ptr->position + node_ptr->surf_dirs.second * FARUtil::kVizRatio;
+            p3 = FARUtil::Point3DToGeoMsgPoint(end_p);
+            corner_surf_marker.points.push_back(p1);
+            corner_surf_marker.points.push_back(p3);
+            corner_helper_marker.points.push_back(p3);
+        }
+    };
+    std::size_t idx = 0;
+    const std::size_t graph_size = graph.size();
+    nav_node_marker.points.resize(graph_size);
+    for (const auto& nav_node_ptr : graph) {
+        if (nav_node_ptr == NULL) {
+            // DEBUG
+            // ROS_WARN("Viz: graph includes NULL nodes");
+            continue;
+        }
+        const geometry_msgs::Point cpoint = FARUtil::Point3DToGeoMsgPoint(nav_node_ptr->position);
+        nav_node_marker.points[idx] = cpoint;
+        if (!nav_node_ptr->is_finalized) {
+            unfinal_node_marker.points.push_back(cpoint);
+        }
+        if (nav_node_ptr->is_navpoint) {
+            internav_node_marker.points.push_back(cpoint);
+        }
+        if (nav_node_ptr->is_near_nodes) {
+            near_node_marker.points.push_back(cpoint);
+        }
+        if (nav_node_ptr->is_covered) {
+            covered_node_marker.points.push_back(cpoint);
+        }
+        if (nav_node_ptr->is_frontier) {
+            frontier_node_marker.points.push_back(cpoint);
+        }
+        if (nav_node_ptr->is_boundary) {
+            boundary_node_marker.points.push_back(cpoint);
+        }
+        Draw_Edge(nav_node_ptr);
+        Draw_Surf_Dir(nav_node_ptr);
+        Draw_Contour_Align(nav_node_ptr);
+        idx++;
+    }
+    nav_node_marker.points.resize(idx);
+    graph_marker_array.markers.push_back(nav_node_marker);
+    graph_marker_array.markers.push_back(unfinal_node_marker);
+    graph_marker_array.markers.push_back(near_node_marker);
+    graph_marker_array.markers.push_back(covered_node_marker);
+    graph_marker_array.markers.push_back(frontier_node_marker);
+    graph_marker_array.markers.push_back(internav_node_marker);
+    graph_marker_array.markers.push_back(boundary_node_marker);
+    graph_marker_array.markers.push_back(edge_marker);
+    graph_marker_array.markers.push_back(visual_edge_marker);
+    graph_marker_array.markers.push_back(free_edge_marker);
+    graph_marker_array.markers.push_back(goal_edge_marker);
+    graph_marker_array.markers.push_back(contour_edge_marker);
+    graph_marker_array.markers.push_back(boundary_edge_marker);
+    graph_marker_array.markers.push_back(odom_edge_marker);
+    graph_marker_array.markers.push_back(traj_edge_marker);
+    graph_marker_array.markers.push_back(corner_surf_marker);
+    graph_marker_array.markers.push_back(corner_helper_marker);
+    graph_marker_array.markers.push_back(contour_align_marker);
+    viz_graph_pub_.publish(graph_marker_array);
 }
 
 void DPVisualizer::VizPointCloud(const ros::Publisher& viz_pub, const PointCloudPtr& pc) {

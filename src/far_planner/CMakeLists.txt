@@ -66,7 +66,7 @@ set(SOURCES ${SOURCES}
   src/map_handler.cpp
   # src/scan_handler.cpp
   # src/graph_msger.cpp
-  # src/terrain_planner.cpp
+  src/terrain_planner.cpp
 )
 
 ## Declare executables

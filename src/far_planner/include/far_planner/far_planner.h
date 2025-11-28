@@ -39,7 +39,7 @@ private:
     ros::NodeHandle nh;
 
     // ROS订阅者
-    ros::Subscriber odom_sub_, terrain_sub_;
+    ros::Subscriber odom_sub_, terrain_sub_, terrain_local_sub_;
 
     ros::Publisher surround_free_debug_, surround_obs_debug_;
     ros::Publisher terrain_height_pub_;
@@ -55,6 +55,7 @@ private:
     PointCloudPtr temp_free_ptr_;       //
     PointCloudPtr temp_cloud_ptr_;      //
     PointCloudPtr terrain_height_ptr_;  // 存储可通行地形的体素位置
+    PointCloudPtr local_terrain_ptr_;
 
     /* veiwpoint extension clouds */
     NavNodePtr odom_node_ptr_ = NULL;
@@ -87,6 +88,7 @@ private:
     // 回调函数
     void OdomCallBack(const nav_msgs::OdometryConstPtr& msg);
     void TerrainCallBack(const sensor_msgs::PointCloud2ConstPtr& pc);
+    void TerrainLocalCallBack(const sensor_msgs::PointCloud2ConstPtr& pc);
 
     /*-------辅助函数-------*/
     void LoadROSParams();

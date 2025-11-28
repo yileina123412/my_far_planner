@@ -58,6 +58,24 @@ public:
     void MatchContourWithNavGraph(
         const NodePtrStack& global_nodes, const NodePtrStack& near_nodes, CTNodeStack& new_convex_vertices);
     void ResetCurrentContour();
+    // 从全局轮廓集合中提取和分类不同类型的轮廓边，为后续的连接验证和碰撞检测提供结构化的轮廓数据
+    void ExtractGlobalContours();
+    // 为超出范围的导航节点寻找合适的轮廓节点重新匹配
+    // out_node_ptr点能否找到near_nodes中合适的连接点
+    // 考虑环境结构的连续性
+    static NavNodePtr MatchOutrangeNodeWithCTNode(const NavNodePtr& out_node_ptr, const NodePtrStack& near_nodes);
+    // 判断近邻节点和超范围节点之间是否存在轮廓线集合对齐关系  超范围节点的重新连接
+    // 判断两个节点之间的连线是否与环境轮廓结构对齐，找到合适的轮廓节点作为连接桥梁。
+    static bool IsContourLineMatch(
+        const NavNodePtr& inNode_ptr, const NavNodePtr& outNode_ptr, CTNodePtr& matched_ctnode);
+    // 判断两个导航节点是否可以通过它们对应的轮廓节点进行连接。
+    // 确保两个导航节点都有对应的轮廓节点
+    static bool IsNavNodesConnectFromContour(const NavNodePtr& node_ptr1, const NavNodePtr& node_ptr2);
+    // 判断两个轮廓节点是否可以沿着同一个多边形轮廓进行连接。
+    static bool IsCTNodesConnectFromContour(const CTNodePtr& ctnode1, const CTNodePtr& ctnode2);
+    // 多边形碰撞检测  确保连接线段在自由空间中
+    static bool IsNavNodesConnectFreePolygon(const NavNodePtr& node_ptr1, const NavNodePtr& node_ptr2);
+
     // 检查两点之间的连接线是否和多边形发生碰撞
     static bool IsPointsConnectFreePolygon(
         const ConnectPair& cedge, const ConnectPair& bd_cedge, const HeightPair h_pair, const bool& is_global_check);
@@ -71,6 +89,10 @@ public:
         node_ptr->is_contour_match = true;
         node_ptr->ctnode = ctnode_ptr;
     }
+    // 将两点的边存储到global_contour_set_里以及根据情况is_boundary也存到boundary_contour_set_里
+    static void AddContourToSets(const NavNodePtr& node_ptr1, const NavNodePtr& node_ptr2);
+    // 从global_contour_set_里删除两点的边
+    static void DeleteContourFromSets(const NavNodePtr& node_ptr1, const NavNodePtr& node_ptr2);
 
 private:
     // 存储结果
@@ -85,7 +107,9 @@ private:
     bool is_robot_inside_poly_ = false;
 
     // global contour set
+    // 存储所有的已有轮廓连接
     static std::unordered_set<NavEdge, navedge_hash> global_contour_set_;
+    // 边界点的轮廓
     static std::unordered_set<NavEdge, navedge_hash> boundary_contour_set_;
 
     /*static private functions*/
@@ -109,6 +133,32 @@ private:
     template <typename NodeType1, typename NodeType2>
     static inline bool IsInMatchHeight(const NodeType1& node_ptr1, const NodeType2& node_ptr2) {
         if (abs(node_ptr1->position.z - node_ptr2->position.z) < FARUtil::kTolerZ) {
+            return true;
+        }
+        return false;
+    }
+
+    static inline bool IsEdgeOverlapInHeight(
+        const HeightPair& cur_hpair, HeightPair ref_hpair, const bool is_extend = true) {
+        if (is_extend) {
+            ref_hpair.minH -= FARUtil::kTolerZ, ref_hpair.maxH += FARUtil::kTolerZ;
+        }
+        if (cur_hpair.maxH < ref_hpair.minH || cur_hpair.minH > ref_hpair.maxH) {
+            return false;
+        }
+        return true;
+    }
+    // 这条边是不是在local范围内
+    static inline bool IsEdgeInLocalRange(const NavNodePtr& node_ptr1, const NavNodePtr& node_ptr2) {
+        if (node_ptr1->is_near_nodes || node_ptr2->is_near_nodes || FARUtil::IsNodeInLocalRange(node_ptr1) ||
+            FARUtil::IsNodeInLocalRange(node_ptr2)) {
+            return true;
+        }
+        return false;
+    }
+    // 这条边的点是不是都是is_active
+    inline bool IsActiveEdge(const NavNodePtr& node_ptr1, const NavNodePtr& node_ptr2) {
+        if (node_ptr1->is_active && node_ptr2->is_active) {
             return true;
         }
         return false;
@@ -189,6 +239,15 @@ private:
         const NavNodePtr& node1, const NavNodePtr& node2, const float& dist, const bool& is_global_check);
     // 生成远离障碍物表面的连接边
     static ConnectPair ReprojectEdge(const CTNodePtr& node1, const NavNodePtr& node2, const float& dist);
+
+    static bool IsValidBoundary(const NavNodePtr& node_ptr1, const NavNodePtr& node_ptr2, bool& is_new);
+    // 如果两个点有一个不再局部范围，则需要全剧检测
+    inline static bool IsNeedGlobalCheck(const Point3D& p1, const Point3D& p2) {
+        if (!FARUtil::IsPointInLocalRange(p1) || !FARUtil::IsPointInLocalRange(p2)) {
+            return true;
+        }
+        return false;
+    }
 };
 
 #endif

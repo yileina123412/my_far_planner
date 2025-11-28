@@ -167,6 +167,7 @@ DynamicGraphParams DynamicGraph::dg_params_;
 NodePtrStack DynamicGraph::globalGraphNodes_;
 std::size_t DynamicGraph::id_tracker_;
 std::unordered_map<std::size_t, NavNodePtr> DynamicGraph::idx_node_map_;
+std::unordered_map<NavNodePtr, std::pair<int, std::unordered_set<NavNodePtr>>> DynamicGraph::out_contour_nodes_map_;
 
 /* init static contour graph values */
 CTNodeStack ContourGraph::polys_ctnodes_;
@@ -191,6 +192,7 @@ void FARMaster::Init() {
     /* initialize subscriber and publisher */
     odom_sub_ = nh.subscribe("/odom_world", 5, &FARMaster::OdomCallBack, this);
     terrain_sub_ = nh.subscribe("/terrain_cloud", 1, &FARMaster::TerrainCallBack, this);
+    terrain_local_sub_ = nh.subscribe("/terrain_local_cloud", 1, &FARMaster::TerrainLocalCallBack, this);
 
     // DEBUG Publisher
     surround_free_debug_ = nh.advertise<sensor_msgs::PointCloud2>("/FAR_free_debug", 1);
@@ -225,6 +227,7 @@ void FARMaster::Init() {
     temp_free_ptr_ = PointCloudPtr(new pcl::PointCloud<PCLPoint>());
     temp_cloud_ptr_ = PointCloudPtr(new pcl::PointCloud<PCLPoint>());
     terrain_height_ptr_ = PointCloudPtr(new pcl::PointCloud<PCLPoint>());
+    local_terrain_ptr_ = PointCloudPtr(new pcl::PointCloud<PCLPoint>());
 
     // clear temp vectors and memory
     this->ClearTempMemory();
@@ -283,16 +286,22 @@ void FARMaster::Loop() {
         new_nodes_.clear();
         if (!is_stop_update_ && graph_manager_.ExtractGraphNodes(new_ctnodes_)) {
             new_nodes_ = graph_manager_.GetNewNodes();
+            ROS_INFO("new_nodes_: %ld ", new_nodes_.size());
         }
 
         /* Graph Updating */
         graph_manager_.UpdateNavGraph(new_nodes_, is_stop_update_, clear_nodes_);
 
         nav_graph_ = graph_manager_.GetNavGraph();
+
+        contour_graph_.ExtractGlobalContours();
         std::cout << "    "
                   << "Number of all vertices adding to global V-Graph: " << nav_graph_.size() << std::endl;
+        const NavNodePtr last_internav_ptr = graph_manager_.GetLastInterNavNode();
 
-        planner_viz_.VizNodes(nav_graph_, "new_nodes", VizColor::ORANGE);
+        planner_viz_.VizNavNodes(nav_graph_, "nav_nodes", VizColor::ORANGE, VizColor::BLUE);
+        // planner_viz_.VizNodes(new_nodes_, "new_nodes", VizColor::BLUE);
+        planner_viz_.VizGraph(nav_graph_);
         planner_viz_.VizContourGraph(ContourGraph::contour_graph_);
 
         ros::Duration elapsed_time = ros::Time::now() - start_time;
@@ -356,6 +365,12 @@ void FARMaster::PrcocessCloud(const sensor_msgs::PointCloud2ConstPtr& pc, const 
             return;
         }
     }
+}
+
+void FARMaster::TerrainLocalCallBack(const sensor_msgs::PointCloud2ConstPtr& pc) {
+    if (master_params_.is_static_env) return;
+    this->PrcocessCloud(pc, local_terrain_ptr_);
+    FARUtil::ExtractFreeAndObsCloud(local_terrain_ptr_, FARUtil::local_terrain_free_, FARUtil::local_terrain_obs_);
 }
 
 void FARMaster::TerrainCallBack(const sensor_msgs::PointCloud2ConstPtr& pc) {
